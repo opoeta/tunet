@@ -23,24 +23,46 @@ if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
     } else { throw 'Instale Python 3.12 (com o launcher py) e execute novamente.' }
 }
 $python = (Get-Command py).Source
-$pythonCheck = & $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
+& $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 não foi encontrado. Instale-o e execute novamente.' }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('tunet-install-' + [guid]::NewGuid().ToString('N'))
-$archive = Join-Path $work 'source.zip'
-$extract = Join-Path $work 'source'
-New-Item -ItemType Directory -Path $extract -Force | Out-Null
-$archiveUrl = "https://github.com/$RepositoryOwner/$RepositoryName/archive/refs/heads/$Branch.zip"
+$sourceRoot = Join-Path $work 'source'
+New-Item -ItemType Directory -Path $sourceRoot -Force | Out-Null
 try {
-    Write-Host "Baixando $RepositoryOwner/$RepositoryName ($Branch)..."
-    Invoke-WebRequest -Uri $archiveUrl -OutFile $archive
-    Expand-Archive -LiteralPath $archive -DestinationPath $extract
-    $source = Get-ChildItem -LiteralPath $extract -Directory | Select-Object -First 1
-    if (-not $source -or -not (Test-Path (Join-Path $source.FullName 'ui_app.py')) -or -not (Test-Path (Join-Path $source.FullName 'train.py'))) {
-        throw 'O arquivo do GitHub não contém os arquivos esperados. Confira repositório e branch.'
+    $apiHeaders = @{ 'Accept' = 'application/vnd.github+json'; 'User-Agent' = 'TuNet-Windows-Installer' }
+    $treeUrl = "https://api.github.com/repos/$RepositoryOwner/$RepositoryName/git/trees/$Branch`?recursive=1"
+    Write-Host "Lendo a árvore $RepositoryOwner/$RepositoryName ($Branch) no GitHub..."
+    $tree = Invoke-RestMethod -Uri $treeUrl -Headers $apiHeaders
+    if (-not $tree.tree) { throw 'Não foi possível localizar a branch no GitHub.' }
+    if ($tree.truncated) { throw 'A árvore retornada pelo GitHub foi truncada; instalação interrompida para evitar arquivos incompletos.' }
+    $files = @($tree.tree | Where-Object { $_.type -eq 'blob' })
+    $requiredFiles = @('ui_app.py','train.py','base/base.yaml')
+    foreach ($required in $requiredFiles) {
+        if ($required -notin $files.path) { throw "Arquivo obrigatório ausente na branch: $required" }
     }
+
+    $branchPath = [uri]::EscapeDataString($Branch)
+    foreach ($entry in $files) {
+        $relative = [string]$entry.path
+        if ([IO.Path]::IsPathRooted($relative) -or ($relative.Split('/') -contains '..')) {
+            throw "Caminho inválido recebido do GitHub: $relative"
+        }
+        $urlPath = (($relative -split '/') | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/'
+        $destination = Join-Path $sourceRoot ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar))
+        $fullDestination = [IO.Path]::GetFullPath($destination)
+        $rootPrefix = [IO.Path]::GetFullPath($sourceRoot).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+        if (-not $fullDestination.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Destino fora da pasta temporária: $relative"
+        }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $fullDestination) -Force | Out-Null
+        $rawUrl = "https://raw.githubusercontent.com/$RepositoryOwner/$RepositoryName/$branchPath/$urlPath"
+        Invoke-WebRequest -Uri $rawUrl -OutFile $fullDestination -UseBasicParsing -Headers @{ 'User-Agent' = 'TuNet-Windows-Installer' }
+    }
+    Write-Host ("Baixados {0} arquivos individualmente do GitHub." -f $files.Count)
+
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-    Get-ChildItem -LiteralPath $source.FullName -Force | ForEach-Object {
+    Get-ChildItem -LiteralPath $sourceRoot -Force | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $InstallDir -Recurse -Force
     }
     $venvPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
@@ -50,7 +72,6 @@ try {
     if ($CpuOnly) {
         Invoke-Native $venvPython @('-m','pip','install','torch','torchvision','--index-url','https://download.pytorch.org/whl/cpu')
     } else {
-        # O índice oficial seleciona as wheels CUDA estáveis mais recentes compatíveis com Windows.
         Invoke-Native $venvPython @('-m','pip','install','torch','torchvision','--index-url','https://download.pytorch.org/whl/cu132')
     }
     Invoke-Native $venvPython @('-m','pip','install','onnx','pyyaml','lpips','onnxruntime','Pillow','albumentations','PySide6')

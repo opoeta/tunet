@@ -1,4 +1,4 @@
-# converter.py (Revised for Cross-Platform support - Minimal Change)
+# Converter support for the Windows TuNet build.
 
 import os
 import argparse

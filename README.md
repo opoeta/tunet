@@ -1,129 +1,74 @@
-<div align="center">
+# TuNet for Windows
 
-# TUNET
-A direct, pixel-level mapping from src to dst images via encoder-decoder.   
-Supports, training, inference or export to Compositor tools such Foundry Nuke or Autodesk Flame native inference.
+Windows community fork of [TuNet](https://github.com/tpc2233/tunet), an encoder-decoder for pixel-to-pixel image mapping. Original project and model by **Thiago Porto (@tpc2233)**. This fork adds Windows support, a PowerShell installer, and a Windows interface.
 
+## Quick install
 
-</div>
-
-## 🎥 Showcases: 
-AOVs:   
-![540_ezgif-45f24ebccb11e0](https://github.com/user-attachments/assets/507167b0-c473-44c0-b444-55f48bc7843b)   
-https://youtu.be/TwvN8axWJLY   
-Models from the video are available for Nuke and Flame can be downloaded link below for test locally:   
-https://f.io/HovatFeX   
-   
-Models has been trained in combination with Nvidia Cosmos foundation models.   
-Using 8x B200 GPUs. Inference can be done in consumer GPUs.
-
-
-
-Rain:   
-Flame:   
-[![Flame video](https://img.youtube.com/vi/6-OFAJtfliM/hqdefault.jpg)](https://youtu.be/6-OFAJtfliM)
-
-
-## For Windows:
-
-Download this fork, then run the PowerShell installer from its folder:
+Open PowerShell and run:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\install.ps1
+irm https://github.com/opoeta/tunet/releases/latest/download/install.ps1 | iex
 ```
 
-It fetches the selected branch from GitHub, installs Python 3.12 if needed, creates a private virtual environment, installs the latest stable PyTorch CUDA 13.2 wheels from the official PyTorch index and adds a TuNet shortcut to the Start menu. A compatible NVIDIA driver is required; the separate CUDA Toolkit is not.
+The installer reads the `windows` branch tree from GitHub and downloads source files individually. It does not clone the repository or download/extract an archive. It installs Python 3.12 if needed, creates a private environment under `%LOCALAPPDATA%`, installs PyTorch with CUDA support and adds a Start menu shortcut.
 
-For CPU-only installation, use `.\install.ps1 -CpuOnly`. To install another fork or branch:
+For a CPU-only install, download only the installer script and invoke it with `-CpuOnly`:
 
 ```powershell
-.\install.ps1 -RepositoryOwner SEU_USUARIO -RepositoryName tunet -Branch windows
+$installer = Join-Path $env:TEMP 'tunet-install.ps1'
+irm https://github.com/opoeta/tunet/releases/latest/download/install.ps1 -OutFile $installer
+& $installer -CpuOnly
 ```
 
-## For macOS:   
-✅ Make sure Miniconda or Anaconda is installed:
-###[[Install Video](https://youtu.be/QaAca_LiwKc))]
+A compatible NVIDIA driver is required for CUDA. The separate CUDA Toolkit is not required. Re-running the installer refreshes the application files from GitHub.
 
-```
-git clone --branch multios --single-branch https://github.com/tpc2233/tunet.git
+## Windows interface
+
+Screenshots captured from the Windows Qt build. Paths are examples; choose your own paired image folders and model output folder before training.
+
+### Main
+
+![TuNet Windows main screen](docs/screenshots/windows-main.png)
+
+### Training settings
+
+![TuNet Windows training settings](docs/screenshots/windows-advanced.png)
+
+### Data augmentation
+
+![TuNet Windows data settings](docs/screenshots/windows-dataloader.png)
+
+### Preview
+
+![TuNet Windows preview screen](docs/screenshots/windows-preview.png)
+
+### Export
+
+![TuNet Windows export screen](docs/screenshots/windows-convert.png)
+
+### About and upstream credit
+
+![TuNet Windows about screen](docs/screenshots/windows-about.png)
+
+## Developer setup
+
+```powershell
+git clone --branch windows --single-branch https://github.com/opoeta/tunet.git
 cd tunet
-
-conda create -n tunet python=3.10 -y
-conda activate tunet
-
-pip install torch torchvision torchaudio  
-
-pip install onnx pyyaml lpips onnxruntime Pillow albumentations PySide6
-
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu132
+.\.venv\Scripts\python.exe -m pip install onnx pyyaml lpips onnxruntime Pillow albumentations PySide6
+.\.venv\Scripts\python.exe ui_app.py
 ```
 
+Check CUDA availability:
 
-
-## For Linux and Multi-GPU use the dedicated Branch:   
-
-```
-check branches
+```powershell
+.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 ```
 
+## Credits and license
 
-✅ How to use, Open Tunet UI: 
-###[[Training Video soon]] 
-```
-python ui_app.py
-
-You are good to go!
-```
-
-
-✅ Tunet UI:
-## Main:
-![main](https://github.com/user-attachments/assets/fe8f03e1-2e53-46b9-8c91-b85befdb3ff9)
-
-## Training:
-![train5](https://github.com/user-attachments/assets/f6bf9ba3-f84b-4d0d-9d95-ff418bebaaf5)
-
-## Converter:
-![convert](https://github.com/user-attachments/assets/8633b5ff-0152-4a09-afaf-1fa7e4669359)
-
-## Adv:
-![adv](https://github.com/user-attachments/assets/f27df935-6677-4c8f-adfb-dbc3b7cd8c9d)
-
-## Data control:
-![data](https://github.com/user-attachments/assets/a30e0160-dc23-4623-9106-d3237700be94)
-
-
-
-### Terminal CMD:
-
-✅ Command line and terminal trainings are still available as usual, check docs:
-```
-soon
-```
-
-
-## Video:
-[[video 🤗](https://youtu.be/UyMq0bsny-A)]
-
-
-### Citation
-
-Consider cite TUNET in your project.
-```
-@article{tpo2025tunet,
-  title={TuNet},
-  author={Thiago Porto},
-  year={2025}
-}
-```
-
-## License
-
-The source code is licensed under the Apache License, Version 2.0.
-Commercial use Permission 
-
-
-
-## Créditos do fork Windows
-
-Projeto, arquitetura e modelo originais por **Thiago Porto (@tpc2233)**: [tpc2233/tunet](https://github.com/tpc2233/tunet). Este é um fork comunitário, sem endosso do autor upstream. Licença Apache-2.0: preserve os avisos de copyright e [LICENSE](LICENSE).
+- Original project, model architecture, and model content: **Thiago Porto (@tpc2233)** — [tpc2233/tunet](https://github.com/tpc2233/tunet).
+- This community fork is not maintained or endorsed by the upstream author.
+- Apache-2.0: preserve the upstream copyright notices and [LICENSE](LICENSE).

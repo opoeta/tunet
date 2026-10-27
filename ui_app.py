@@ -1,7 +1,7 @@
 # ==============================================================================
 # Tunet Training Control UI 
 #
-# A cross-platform desktop application built with PySide6.
+# A Windows desktop application built with PySide6.
 #
 # require: pip install PySide6
 #
@@ -14,7 +14,6 @@ import threading
 import signal
 import yaml
 from pathlib import Path
-import platform
 import shutil
 
 from PySide6.QtWidgets import (
@@ -70,7 +69,7 @@ class FileCopyWorker(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Tunet Training UI - Running on {platform.system()}")
+        self.setWindowTitle("TuNet - Windows")
         self.setGeometry(100, 100, 1100, 760)
         self.setMinimumSize(850, 620)
         self.setStyleSheet("""QMainWindow { background: #101820; } QWidget { color: #e8eef2; font-size: 10pt; } QTabWidget::pane { border: 1px solid #30414c; border-radius: 8px; background: #17232c; } QTabBar::tab { background: #1d2c36; padding: 9px 14px; margin-right: 3px; border-top-left-radius: 6px; border-top-right-radius: 6px; } QTabBar::tab:selected { background: #263b46; color: #72dfc3; } QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit { background: #111b22; border: 1px solid #40545f; border-radius: 5px; padding: 6px; selection-background-color: #187d70; } QPushButton { background: #263b46; border: 1px solid #49616d; border-radius: 6px; padding: 8px 12px; } QPushButton:hover { border-color: #72dfc3; } QPushButton:focus { border: 2px solid #72dfc3; } QPushButton:disabled { color: #87949b; background: #202a30; } QCheckBox { spacing: 8px; }""")
@@ -78,6 +77,9 @@ class MainWindow(QMainWindow):
         self.preview_image_path = None; self.original_pixmap = None; self.copy_thread = None; self.conversion_target = None
         self.central_widget = QWidget(); self.setCentralWidget(self.central_widget)
         self.main_layout = QVBoxLayout(self.central_widget)
+        self.header_label = QLabel("TUNET  /  WINDOWS")
+        self.header_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #72dfc3; padding: 4px 8px;")
+        self.main_layout.addWidget(self.header_label)
         self.tabs = QTabWidget()
         self.console_output = QTextEdit(); self.console_output.setReadOnly(True); self.console_output.setFontFamily("monospace")
         splitter = QSplitter(Qt.Vertical); splitter.addWidget(self.tabs); splitter.addWidget(self.console_output); splitter.setSizes([550, 150])
@@ -105,8 +107,6 @@ class MainWindow(QMainWindow):
     
     def create_main_tab(self):
         tab = QWidget(); layout = QFormLayout(tab); layout.addRow(QLabel("--- Launcher Settings ---")); self.train_script_input = self.create_path_selector("Training Script (.py)", is_file=True); layout.addRow("Training Script:", self.train_script_input)
-        if platform.system() == 'Linux': self.nproc_input = QSpinBox(minimum=1, maximum=16, value=1); layout.addRow("GPUs (nproc_per_node):", self.nproc_input)
-        else: self.nproc_input = None
         layout.addRow(QLabel(" ")); self.src_dir_input = self.create_path_selector("Source Directory"); self.dst_dir_input = self.create_path_selector("Destination Directory"); self.model_folder_input = self.create_path_selector("Model Folder", is_output=True); self.resolution_input = QComboBox(); self.resolution_input.addItems(["512", "1024"]); self.model_size_dims_input = QComboBox(); self.model_size_dims_input.addItems(["64", "128", "256", "512"]); self.model_size_dims_input.setCurrentText("64"); layout.addRow(QLabel("--- Data Settings ---")); layout.addRow("Source Directory:", self.src_dir_input); layout.addRow("Destination Directory:", self.dst_dir_input); layout.addRow("Model Folder:", self.model_folder_input); layout.addRow("Resolution:", self.resolution_input); layout.addRow(QLabel("--- Model Settings ---")); layout.addRow("Model Size Dims:", self.model_size_dims_input); self.tabs.addTab(tab, "Main")
     def create_path_selector(self, label_text, is_output=False, is_file=False):
         widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(0, 0, 0, 0); line_edit = QLineEdit(); button = QPushButton("Browse...")
@@ -191,7 +191,7 @@ class MainWindow(QMainWindow):
     def create_about_tab(self):
         tab = QWidget(); layout = QVBoxLayout(tab); layout.setAlignment(Qt.AlignCenter); title = QLabel("Tunet by tpo.comp"); title.setStyleSheet("font-size: 18px; font-weight: bold;"); desc_text = ("A direct, pixel-level mapping from src to dst images via an encoder-decoder network.\n" "Supports training, inference, and export to VFX tools."); description = QLabel(desc_text); description.setAlignment(Qt.AlignCenter); description.setWordWrap(True); support_text = "Native inference support in Autodesk Flame or Foundry Nuke."; support = QLabel(support_text); support.setAlignment(Qt.AlignCenter); credit = QLabel("Windows community fork by opoeta. Original project and model by Thiago Porto (@tpc2233).") ; credit.setAlignment(Qt.AlignCenter); credit.setWordWrap(True); source_title = QLabel("Upstream source:"); source_link = QLabel('<a href="https://github.com/tpc2233/tunet">https://github.com/tpc2233/tunet</a>'); source_link.setOpenExternalLinks(True); source_link.setAlignment(Qt.AlignCenter); layout.addStretch(); layout.addWidget(title); layout.addSpacing(15); layout.addWidget(description); layout.addSpacing(10); layout.addWidget(support); layout.addSpacing(25); layout.addWidget(credit); layout.addSpacing(12); layout.addWidget(source_title); layout.addWidget(source_link); layout.addStretch(); self.tabs.addTab(tab, "About")
     def create_control_panel(self):
-        control_layout = QHBoxLayout(); self.load_btn = QPushButton("Load Config"); self.save_btn = QPushButton("Save Config"); self.start_btn = QPushButton("Start Training"); self.stop_btn = QPushButton("Stop Training"); self.load_btn.clicked.connect(self.load_config_from_file); self.save_btn.clicked.connect(self.save_config_to_file); self.start_btn.clicked.connect(self.start_training); self.stop_btn.clicked.connect(self.stop_training); self.stop_btn.setEnabled(False); self.start_btn.setStyleSheet("background-color: #a8e6cf;"); self.stop_btn.setStyleSheet("background-color: #ff8a80;"); control_layout.addWidget(self.load_btn); control_layout.addWidget(self.save_btn); control_layout.addStretch(); control_layout.addWidget(self.start_btn); control_layout.addWidget(self.stop_btn); return control_layout
+        control_layout = QHBoxLayout(); self.load_btn = QPushButton("Load Config"); self.save_btn = QPushButton("Save Config"); self.start_btn = QPushButton("Start Training"); self.stop_btn = QPushButton("Stop Training"); self.load_btn.clicked.connect(self.load_config_from_file); self.save_btn.clicked.connect(self.save_config_to_file); self.start_btn.clicked.connect(self.start_training); self.stop_btn.clicked.connect(self.stop_training); self.stop_btn.setEnabled(False); self.start_btn.setStyleSheet("QPushButton { background-color: #a8e6cf; color: #10201c; } QPushButton:disabled { background-color: #354047; color: #89979c; }"); self.stop_btn.setStyleSheet("QPushButton { background-color: #ff8a80; color: #301412; } QPushButton:disabled { background-color: #354047; color: #89979c; }"); control_layout.addWidget(self.load_btn); control_layout.addWidget(self.save_btn); control_layout.addStretch(); control_layout.addWidget(self.start_btn); control_layout.addWidget(self.stop_btn); return control_layout
     
     def gather_config_from_ui(self):
         def get_path(widget): return widget.findChild(QLineEdit).text()
@@ -221,13 +221,12 @@ class MainWindow(QMainWindow):
             augs.append(gamma_dict)
 
         config = {'data': {'src_dir': get_path(self.src_dir_input), 'dst_dir': get_path(self.dst_dir_input), 'output_dir': get_path(self.model_folder_input), 'resolution': int(self.resolution_input.currentText())}, 'model': {'model_size_dims': int(self.model_size_dims_input.currentText())}, 'training': {'iterations_per_epoch': self.iter_per_epoch_input.value(), 'batch_size': self.batch_size_input.value(), 'use_amp': self.use_amp_input.isChecked()}, 'logging': {'log_interval': self.log_interval_input.value(), 'preview_batch_interval': self.preview_interval_input.value(), 'preview_refresh_rate': self.preview_refresh_input.value()}, 'saving': {'keep_last_checkpoints': self.keep_checkpoints_input.value()}, 'dataloader': {'datasets': {'shared_augs': augs}}}
-        config['_ui_settings'] = {'train_script_path': get_path(self.train_script_input), 'nproc_per_node': self.nproc_input.value() if self.nproc_input else 1}
+        config['_ui_settings'] = {'train_script_path': get_path(self.train_script_input)}
         return config
 
     def populate_ui_from_config(self, config):
         def get_path_widget(widget): return widget.findChild(QLineEdit)
         ui_settings = config.get('_ui_settings', {}); get_path_widget(self.train_script_input).setText(ui_settings.get('train_script_path', ''))
-        if self.nproc_input: self.nproc_input.setValue(ui_settings.get('nproc_per_node', 1))
         get_path_widget(self.src_dir_input).setText(config.get('data', {}).get('src_dir', '')); get_path_widget(self.dst_dir_input).setText(config.get('data', {}).get('dst_dir', '')); get_path_widget(self.model_folder_input).setText(config.get('data', {}).get('output_dir', '')); self.resolution_input.setCurrentText(str(config.get('data', {}).get('resolution', 512))); self.model_size_dims_input.setCurrentText(str(config.get('model', {}).get('model_size_dims', 128))); self.iter_per_epoch_input.setValue(config.get('training', {}).get('iterations_per_epoch', 500)); self.batch_size_input.setValue(config.get('training', {}).get('batch_size', 4)); self.use_amp_input.setChecked(config.get('training', {}).get('use_amp', True)); self.log_interval_input.setValue(config.get('logging', {}).get('log_interval', 5)); self.preview_interval_input.setValue(config.get('logging', {}).get('preview_batch_interval', 35)); self.preview_refresh_input.setValue(config.get('logging', {}).get('preview_refresh_rate', 5)); self.keep_checkpoints_input.setValue(config.get('saving', {}).get('keep_last_checkpoints', 4))
         
         # Reset augs before populating
@@ -265,16 +264,10 @@ class MainWindow(QMainWindow):
         script_config = {k: v for k, v in full_config.items() if k != '_ui_settings'}
         with open(self.config_file_path, 'w') as f:
             yaml.dump(script_config, f, Dumper=IndentDumper, sort_keys=False, default_flow_style=False, indent=2)
-        self.console_output.clear(); current_os = platform.system(); command = []
-        if current_os == 'Linux':
-            nproc = full_config['_ui_settings']['nproc_per_node']
-            command = ['torchrun', '--standalone', '--nnodes=1', f'--nproc_per_node={nproc}', train_script, '--config', str(self.config_file_path)]
-        elif current_os in ['Windows', 'Darwin']:
-            command = [sys.executable, train_script, '--config', str(self.config_file_path)]
-        else: QMessageBox.critical(self, "Unsupported OS", f"'{current_os}' is not supported."); return
-        self.console_output.append(f"OS Detected: {current_os}\nRunning command:\n{' '.join(command)}\n\n")
-        creation_flags = 0
-        if platform.system() == "Windows": creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
+        self.console_output.clear()
+        command = [sys.executable, train_script, '--config', str(self.config_file_path)]
+        self.console_output.append(f"Platform: Windows\nRunning command:\n{' '.join(command)}\n\n")
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
         try:
             self.process = subprocess.Popen(
                 command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, creationflags=creation_flags, encoding='utf-8', errors='replace'
@@ -295,8 +288,7 @@ class MainWindow(QMainWindow):
     def stop_training(self):
         if self.process and self.process.poll() is None:
             self.console_output.append("\n--- Sending stop signal ---")
-            if platform.system() == "Windows": self.process.send_signal(signal.CTRL_BREAK_EVENT)
-            else: self.process.send_signal(signal.SIGINT)
+            self.process.send_signal(signal.CTRL_BREAK_EVENT)
         else: self.console_output.append("Stop clicked, but no active process found.\n")
     def run_flame_conversion(self): self.start_conversion_process('flame')
     def run_nuke_conversion(self): self.start_conversion_process('nuke')
