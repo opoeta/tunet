@@ -20,7 +20,7 @@ irm https://github.com/opoeta/tunet/releases/latest/download/install.ps1 -OutFil
 & $installer -CpuOnly
 ```
 
-A compatible NVIDIA driver is required for CUDA. The separate CUDA Toolkit is not required. Re-running the installer refreshes the application files from GitHub.
+A compatible NVIDIA driver is required for CUDA. The separate CUDA Toolkit is not required. The installer detects whether TuNet is already installed, reports whether it is performing a new installation or an update, and reuses the existing Python environment when updating.
 
 ## Windows interface
 

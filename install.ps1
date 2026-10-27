@@ -16,15 +16,26 @@ function Invoke-Native {
 }
 
 if ($env:OS -ne 'Windows_NT') { throw 'Este instalador requer Windows.' }
-if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Write-Host 'Instalando Python 3.12 no escopo do usuário...'
-        Invoke-Native 'winget' @('install','--id','Python.Python.3.12','--exact','--scope','user','--accept-package-agreements','--accept-source-agreements')
-    } else { throw 'Instale Python 3.12 (com o launcher py) e execute novamente.' }
+$venvPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
+$isUpdate = (Test-Path (Join-Path $InstallDir 'ui_app.py')) -and (Test-Path $venvPython)
+if ($isUpdate) {
+    Write-Host "Existing TuNet installation detected. Updating files in: $InstallDir"
+} else {
+    Write-Host "No complete TuNet installation detected. Preparing a new installation in: $InstallDir"
 }
-$python = (Get-Command py).Source
-& $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
-if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 não foi encontrado. Instale-o e execute novamente.' }
+
+$python = $null
+if (-not (Test-Path $venvPython)) {
+    if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            Write-Host 'Installing Python 3.12 for the current user...'
+            Invoke-Native 'winget' @('install','--id','Python.Python.3.12','--exact','--scope','user','--accept-package-agreements','--accept-source-agreements')
+        } else { throw 'Install Python 3.12 with the py launcher and run this script again.' }
+    }
+    $python = (Get-Command py).Source
+    & $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 was not found. Install it and run this script again.' }
+}
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('tunet-install-' + [guid]::NewGuid().ToString('N'))
 $sourceRoot = Join-Path $work 'source'
@@ -65,9 +76,7 @@ try {
     Get-ChildItem -LiteralPath $sourceRoot -Force | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $InstallDir -Recurse -Force
     }
-    $venvPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
     if (-not (Test-Path $venvPython)) { Invoke-Native $python @('-3.12','-m','venv',(Join-Path $InstallDir '.venv')) }
-    $venvPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
     Invoke-Native $venvPython @('-m','pip','install','--upgrade','pip')
     if ($CpuOnly) {
         Invoke-Native $venvPython @('-m','pip','install','torch','torchvision','--index-url','https://download.pytorch.org/whl/cpu')
@@ -85,8 +94,13 @@ try {
     $shortcut.WorkingDirectory = $InstallDir
     $shortcut.Description = 'TuNet — treinamento e inferência de imagens'
     $shortcut.Save()
-    Write-Host "Instalação concluída: $InstallDir"
-    Write-Host 'Abra TuNet pelo menu Iniciar. Os checkpoints ficam na pasta escolhida na interface.'
+    if ($isUpdate) {
+        Write-Host "TuNet update completed: $InstallDir"
+        Write-Host 'The existing virtual environment was reused. Open TuNet from the Start menu.'
+    } else {
+        Write-Host "New TuNet installation completed: $InstallDir"
+        Write-Host 'Open TuNet from the Start menu. Checkpoints are saved to the folder selected in the interface.'
+    }
 } finally {
     if (Test-Path $work) { Remove-Item -LiteralPath $work -Recurse -Force }
 }

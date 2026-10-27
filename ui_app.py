@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tunet Training Control UI 
+# Tunet Training Control UI
 #
 # A Windows desktop application built with PySide6.
 #
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Vertical); splitter.addWidget(self.tabs); splitter.addWidget(self.console_output); splitter.setSizes([550, 150])
         self.main_layout.addWidget(splitter); self.main_layout.addLayout(self.create_control_panel())
         self.create_main_tab(); self.create_advanced_tab(); self.create_dataloader_tab()
-        self.create_preview_tab(); self.create_convert_tab(); self.create_about_tab()
+        self.create_preview_tab(); self.create_convert_tab(); self.create_about_tab(); self.create_help_tab()
         icon_dir = Path(__file__).parent / "assets" / "icons"
         for index, icon_name in enumerate(("overview", "settings", "dataset", "preview", "export", "info")):
             icon_path = icon_dir / f"{icon_name}.svg"
@@ -104,12 +104,23 @@ class MainWindow(QMainWindow):
                 line_edit = self.train_script_input.findChild(QLineEdit)
                 if line_edit: line_edit.setText(str(default_script_path.resolve()))
         except (NameError, Exception): pass
-    
+
     def create_main_tab(self):
         tab = QWidget(); layout = QFormLayout(tab); layout.addRow(QLabel("--- Launcher Settings ---")); self.train_script_input = self.create_path_selector("Training Script (.py)", is_file=True); layout.addRow("Training Script:", self.train_script_input)
         layout.addRow(QLabel(" ")); self.src_dir_input = self.create_path_selector("Source Directory"); self.dst_dir_input = self.create_path_selector("Destination Directory"); self.model_folder_input = self.create_path_selector("Model Folder", is_output=True); self.resolution_input = QComboBox(); self.resolution_input.addItems(["512", "1024"]); self.model_size_dims_input = QComboBox(); self.model_size_dims_input.addItems(["64", "128", "256", "512"]); self.model_size_dims_input.setCurrentText("64"); layout.addRow(QLabel("--- Data Settings ---")); layout.addRow("Source Directory:", self.src_dir_input); layout.addRow("Destination Directory:", self.dst_dir_input); layout.addRow("Model Folder:", self.model_folder_input); layout.addRow("Resolution:", self.resolution_input); layout.addRow(QLabel("--- Model Settings ---")); layout.addRow("Model Size Dims:", self.model_size_dims_input); self.tabs.addTab(tab, "Main")
+        self.resolution_input.setToolTip("Square image resolution used for training. 1024 preserves more detail and uses more VRAM than 512.")
+        self.model_size_dims_input.setToolTip("Base internal model width. Higher values increase capacity and memory use; keep this value when resuming a checkpoint.")
+
     def create_path_selector(self, label_text, is_output=False, is_file=False):
         widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(0, 0, 0, 0); line_edit = QLineEdit(); button = QPushButton("Browse...")
+        descriptions = {
+            "Training Script (.py)": "Python script that starts training. Usually, select the train.py file included with TuNet.",
+            "Source Directory": "Folder containing input (src) images. Filenames should match those in the Destination folder.",
+            "Destination Directory": "Folder containing target (dst) images, paired by filename with Source Directory.",
+            "Model Folder": "Folder where checkpoints and previews are saved. To convert a model, select the folder containing the .pth file.",
+        }
+        line_edit.setToolTip(descriptions.get(label_text, "Select the path used by this option."))
+        button.setToolTip("Browse for and select " + ("a .py file" if is_file else "a folder") + ".")
         if is_file: button.clicked.connect(lambda: self.select_file(line_edit))
         else: button.clicked.connect(lambda: self.select_directory(line_edit))
         layout.addWidget(line_edit); layout.addWidget(button)
@@ -123,6 +134,9 @@ class MainWindow(QMainWindow):
         if file_path: line_edit.setText(file_path)
     def create_advanced_tab(self):
         tab = QWidget(); layout = QFormLayout(tab); self.iter_per_epoch_input = QSpinBox(minimum=1, maximum=10000, value=500); self.batch_size_input = QSpinBox(minimum=1, maximum=256, value=2); self.use_amp_input = QCheckBox("Enable fp16 Mixed-precision"); self.use_amp_input.setChecked(False); self.log_interval_input = QSpinBox(minimum=1, maximum=1000, value=5); self.preview_interval_input = QSpinBox(minimum=0, maximum=1000, value=35); self.preview_refresh_input = QSpinBox(minimum=0, maximum=1000, value=5); self.keep_checkpoints_input = QSpinBox(minimum=1, maximum=50, value=4); layout.addRow(QLabel("--- Training Settings ---")); layout.addRow("Iterations per Epoch:", self.iter_per_epoch_input); layout.addRow("Batch Size (per GPU):", self.batch_size_input); layout.addRow("Use AMP:", self.use_amp_input); layout.addRow(QLabel("--- Logging & Saving Settings ---")); layout.addRow("Log Interval:", self.log_interval_input); layout.addRow("Preview Batch Interval:", self.preview_interval_input); layout.addRow("Preview Refresh Rate:", self.preview_refresh_input); layout.addRow("Keep Last Checkpoints:", self.keep_checkpoints_input); self.tabs.addTab(tab, "Advanced")
+
+        for control, tip in ((self.iter_per_epoch_input, "Number of training batches in each epoch. More iterations increase epoch duration."), (self.batch_size_input, "Number of image pairs processed together per GPU. Increase only if enough VRAM is available."), (self.use_amp_input, "Uses FP16 mixed precision to reduce VRAM and potentially speed up compatible GPUs. Disable if you see numerical instability."), (self.log_interval_input, "Writes metrics to the console every N iterations."), (self.preview_interval_input, "Generates a preview every N batches; 0 disables previews."), (self.preview_refresh_input, "Refreshes the image pairs shown in previews every N preview saves; 0 keeps the initial pairs."), (self.keep_checkpoints_input, "Number of older epoch checkpoints to keep. Older checkpoints are removed automatically.")):
+            control.setToolTip(tip)
 
     def create_dataloader_tab(self):
         tab = QWidget()
@@ -140,7 +154,7 @@ class MainWindow(QMainWindow):
         self.affine_check = QCheckBox("Affine")
         self.affine_p = QSpinBox(minimum=0, maximum=100, value=40); self.affine_p.setSuffix("%")
         affine_p_layout = QHBoxLayout(); affine_p_layout.addWidget(self.affine_check); affine_p_layout.addWidget(self.affine_p); layout.addRow(affine_p_layout)
-        
+
         # Scale
         self.affine_scale_min = QDoubleSpinBox(decimals=2, minimum=0.1, maximum=5.0, value=0.9, singleStep=0.05)
         self.affine_scale_max = QDoubleSpinBox(decimals=2, minimum=0.1, maximum=5.0, value=1.1, singleStep=0.05)
@@ -173,7 +187,16 @@ class MainWindow(QMainWindow):
         self.gamma_limit_min = QSpinBox(minimum=0, maximum=255, value=40)
         self.gamma_limit_max = QSpinBox(minimum=0, maximum=255, value=160)
         layout.addRow("  Gamma Limit:", self.create_range_layout(self.gamma_limit_min, self.gamma_limit_max))
-        
+
+        self.hflip_check.setToolTip("Randomly flips both images in a pair horizontally while preserving alignment."); self.hflip_p.setToolTip("Probability, as a percentage, of applying the flip to each sample.")
+        self.affine_check.setToolTip("Applies a random geometric transformation to both images in a pair."); self.affine_p.setToolTip("Probability, as a percentage, of applying the affine transform.")
+        self.affine_scale_min.setToolTip("Minimum random scale; 1.0 keeps the original size."); self.affine_scale_max.setToolTip("Maximum random scale.")
+        self.affine_translate_min.setToolTip("Minimum offset relative to image width/height; -0.1 means -10%."); self.affine_translate_max.setToolTip("Maximum offset relative to image width/height; 0.1 means 10%.")
+        self.affine_rotate_min.setToolTip("Minimum rotation angle, in degrees."); self.affine_rotate_max.setToolTip("Maximum rotation angle, in degrees.")
+        self.affine_shear_min.setToolTip("Minimum shear angle, in degrees."); self.affine_shear_max.setToolTip("Maximum shear angle, in degrees.")
+        self.affine_interpolation.setToolTip("Interpolation method used to fill pixels after a transform. Keep the default if unsure."); self.affine_keep_ratio.setToolTip("Preserves the width-to-height ratio when scaling.")
+        self.gamma_check.setToolTip("Applies random gamma variation to simulate brightness differences."); self.gamma_p.setToolTip("Probability, as a percentage, of applying random gamma.")
+        self.gamma_limit_min.setToolTip("Lower bound of the random gamma range."); self.gamma_limit_max.setToolTip("Upper bound of the random gamma range.")
         self.tabs.addTab(tab, "Dataloader")
 
     def create_range_layout(self, min_widget, max_widget):
@@ -183,22 +206,42 @@ class MainWindow(QMainWindow):
         layout.addWidget(max_widget)
         widget = QWidget(); widget.setLayout(layout)
         return widget
-        
+
     def create_preview_tab(self):
         self.preview_tab = QWidget(); main_layout = QVBoxLayout(self.preview_tab); self.scroll_area = QScrollArea(); self.scroll_area.setWidgetResizable(True); self.preview_label = QLabel("Waiting for preview image..."); self.preview_label.setAlignment(Qt.AlignCenter); self.scroll_area.setWidget(self.preview_label); controls_layout = QHBoxLayout(); self.zoom_combo = QComboBox(); self.zoom_combo.addItems(["Fit", "50%", "100%", "200%"]); self.zoom_combo.currentTextChanged.connect(self.apply_zoom); controls_layout.addStretch(); controls_layout.addWidget(QLabel("Zoom:")); controls_layout.addWidget(self.zoom_combo); controls_layout.addStretch(); self.labels_container = QWidget(); labels_layout = QHBoxLayout(self.labels_container); labels_layout.setContentsMargins(0,0,0,0); src_label = QLabel("src data"); dst_label = QLabel("dst data"); model_label = QLabel("Model result"); src_label.setAlignment(Qt.AlignLeft); dst_label.setAlignment(Qt.AlignCenter); model_label.setAlignment(Qt.AlignRight); labels_layout.addWidget(src_label); labels_layout.addWidget(dst_label); labels_layout.addWidget(model_label); main_layout.addWidget(self.scroll_area, stretch=1); main_layout.addLayout(controls_layout); main_layout.addWidget(self.labels_container); self.tabs.addTab(self.preview_tab, "Preview")
+        self.zoom_combo.setToolTip("Changes preview magnification; Fit scales the image to the panel.")
+
     def create_convert_tab(self):
         tab = QWidget(); layout = QVBoxLayout(tab); layout.addStretch(); self.convert_flame_btn = QPushButton("Convert to Autodesk Flame"); self.convert_flame_btn.clicked.connect(self.run_flame_conversion); self.convert_nuke_btn = QPushButton("Convert to Foundry Nuke"); self.convert_nuke_btn.clicked.connect(self.run_nuke_conversion); self.copy_before_convert_check = QCheckBox("Copy checkpoint to subfolder before converting"); self.copy_before_convert_check.setChecked(True); self.copy_before_convert_check.setStyleSheet("margin-top: 10px;"); layout.addWidget(self.convert_flame_btn); layout.addWidget(self.convert_nuke_btn); layout.addWidget(self.copy_before_convert_check, alignment=Qt.AlignCenter); layout.addStretch(); self.tabs.addTab(tab, "Convert")
+        self.convert_flame_btn.setToolTip("Select a .pth checkpoint to prepare it for Autodesk Flame."); self.convert_nuke_btn.setToolTip("Select a .pth checkpoint to prepare it for Foundry Nuke."); self.copy_before_convert_check.setToolTip("Copies the checkpoint to a Flame/Nuke subfolder before conversion. Uncheck to use the original file.")
+    def create_help_tab(self):
+        tab = QWidget(); layout = QVBoxLayout(tab); guide = QTextEdit(); guide.setReadOnly(True)
+        guide.setHtml("""
+            <h2>TuNet Quick Guide</h2>
+            <p>TuNet learns to transform an input image (src) into a target image (dst). Use matching pairs with identical filenames and aligned content.</p>
+            <h3>Main</h3>
+            <ul><li><b>Training Script:</b> Python training script; use the included train.py.</li><li><b>Source Directory:</b> input images.</li><li><b>Destination Directory:</b> target images paired with the inputs.</li><li><b>Model Folder:</b> folder where checkpoints and previews are saved; training can create it. Conversion requires a .pth checkpoint inside this folder.</li><li><b>Resolution:</b> square image size used for training; higher values preserve detail and require more VRAM.</li><li><b>Model Size Dims:</b> model base width/capacity. Higher values use more resources. Keep this value when resuming a checkpoint.</li></ul>
+            <h3>Advanced</h3>
+            <ul><li><b>Iterations per Epoch:</b> training batches per epoch.</li><li><b>Batch Size:</b> image pairs processed per GPU at each step. Reduce this if you run out of VRAM.</li><li><b>Mixed-precision:</b> FP16 can reduce VRAM use and may speed up compatible GPUs.</li><li><b>Log Interval:</b> how often metrics are printed to the console, in iterations.</li><li><b>Preview Batch Interval:</b> how often previews are generated; 0 disables them.</li><li><b>Preview Refresh Rate:</b> refreshes the image pairs shown in previews every N preview saves; 0 keeps the initial pairs.</li><li><b>Keep Last Checkpoints:</b> number of older epoch checkpoints to retain; older ones are removed.</li></ul>
+            <h3>Dataloader</h3>
+            <ul><li><b>HorizontalFlip:</b> flips both images in a pair horizontally. The percentage is the chance of applying the flip to each sample.</li><li><b>Affine:</b> enables paired geometric transformations; the percentage is the chance of applying one.</li><li><b>Scale:</b> random scaling range; 1.0 keeps the original size.</li><li><b>Translate %:</b> offset range as a fraction of image width/height; 0.1 means 10%.</li><li><b>Rotate / Shear:</b> rotation and shear ranges in degrees.</li><li><b>Interpolation:</b> method used to estimate pixels created by a transform; keep the default if unsure.</li><li><b>Keep Ratio:</b> preserves the width-to-height ratio while scaling.</li><li><b>RandomGamma:</b> random tonal brightness variation; the percentage is the chance of applying it and Gamma Limit sets the range.</li></ul>
+            <h3>Preview, Convert, and Controls</h3>
+            <ul><li><b>Preview:</b> displays src, dst, and model output during training. Zoom changes magnification.</li><li><b>Convert to Autodesk Flame / Foundry Nuke:</b> choose a .pth checkpoint to prepare it for the selected application.</li><li><b>Copy checkpoint:</b> when checked, copies the checkpoint to a Flame or Nuke subfolder before conversion; when unchecked, uses the original file.</li><li><b>Load Config / Save Config:</b> loads or saves options in a configuration file.</li><li><b>Start Training / Stop Training:</b> starts training or requests the running process to stop.</li><li><b>Console:</b> displays messages, progress, and errors; check it if training does not start.</li><li><b>About:</b> credits and a link to the original project.</li></ul>
+            <p>Start with the default values. Check image pairs and folders before training; higher resolution, batch size, or model dimensions use more memory.</p>
+        """)
+        layout.addWidget(guide); self.tabs.addTab(tab, "Instructions")
+
     def create_about_tab(self):
         tab = QWidget(); layout = QVBoxLayout(tab); layout.setAlignment(Qt.AlignCenter); title = QLabel("Tunet by tpo.comp"); title.setStyleSheet("font-size: 18px; font-weight: bold;"); desc_text = ("A direct, pixel-level mapping from src to dst images via an encoder-decoder network.\n" "Supports training, inference, and export to VFX tools."); description = QLabel(desc_text); description.setAlignment(Qt.AlignCenter); description.setWordWrap(True); support_text = "Native inference support in Autodesk Flame or Foundry Nuke."; support = QLabel(support_text); support.setAlignment(Qt.AlignCenter); credit = QLabel("Windows community fork by opoeta. Original project and model by Thiago Porto (@tpc2233).") ; credit.setAlignment(Qt.AlignCenter); credit.setWordWrap(True); source_title = QLabel("Upstream source:"); source_link = QLabel('<a href="https://github.com/tpc2233/tunet">https://github.com/tpc2233/tunet</a>'); source_link.setOpenExternalLinks(True); source_link.setAlignment(Qt.AlignCenter); layout.addStretch(); layout.addWidget(title); layout.addSpacing(15); layout.addWidget(description); layout.addSpacing(10); layout.addWidget(support); layout.addSpacing(25); layout.addWidget(credit); layout.addSpacing(12); layout.addWidget(source_title); layout.addWidget(source_link); layout.addStretch(); self.tabs.addTab(tab, "About")
     def create_control_panel(self):
-        control_layout = QHBoxLayout(); self.load_btn = QPushButton("Load Config"); self.save_btn = QPushButton("Save Config"); self.start_btn = QPushButton("Start Training"); self.stop_btn = QPushButton("Stop Training"); self.load_btn.clicked.connect(self.load_config_from_file); self.save_btn.clicked.connect(self.save_config_to_file); self.start_btn.clicked.connect(self.start_training); self.stop_btn.clicked.connect(self.stop_training); self.stop_btn.setEnabled(False); self.start_btn.setStyleSheet("QPushButton { background-color: #a8e6cf; color: #10201c; } QPushButton:disabled { background-color: #354047; color: #89979c; }"); self.stop_btn.setStyleSheet("QPushButton { background-color: #ff8a80; color: #301412; } QPushButton:disabled { background-color: #354047; color: #89979c; }"); control_layout.addWidget(self.load_btn); control_layout.addWidget(self.save_btn); control_layout.addStretch(); control_layout.addWidget(self.start_btn); control_layout.addWidget(self.stop_btn); return control_layout
-    
+        control_layout = QHBoxLayout(); self.load_btn = QPushButton("Load Config"); self.save_btn = QPushButton("Save Config"); self.start_btn = QPushButton("Start Training"); self.stop_btn = QPushButton("Stop Training"); self.load_btn.clicked.connect(self.load_config_from_file); self.save_btn.clicked.connect(self.save_config_to_file); self.start_btn.clicked.connect(self.start_training); self.stop_btn.clicked.connect(self.stop_training); self.stop_btn.setEnabled(False); self.start_btn.setStyleSheet("QPushButton { background-color: #a8e6cf; color: #10201c; } QPushButton:disabled { background-color: #354047; color: #89979c; }"); self.stop_btn.setStyleSheet("QPushButton { background-color: #ff8a80; color: #301412; } QPushButton:disabled { background-color: #354047; color: #89979c; }"); self.load_btn.setToolTip("Opens a previously saved configuration file."); self.save_btn.setToolTip("Saves the current options to a configuration file."); self.start_btn.setToolTip("Validates the folders and starts training with the current options."); self.stop_btn.setToolTip("Requests the running training process to stop."); control_layout.addWidget(self.load_btn); control_layout.addWidget(self.save_btn); control_layout.addStretch(); control_layout.addWidget(self.start_btn); control_layout.addWidget(self.stop_btn); return control_layout
+
     def gather_config_from_ui(self):
         def get_path(widget): return widget.findChild(QLineEdit).text()
         augs = []
         if self.hflip_check.isChecked():
             augs.append({'_target_': 'albumentations.HorizontalFlip', 'p': self.hflip_p.value() / 100.0})
-        
+
         if self.affine_check.isChecked():
             affine_dict = {
                 '_target_': 'albumentations.Affine',
@@ -228,7 +271,7 @@ class MainWindow(QMainWindow):
         def get_path_widget(widget): return widget.findChild(QLineEdit)
         ui_settings = config.get('_ui_settings', {}); get_path_widget(self.train_script_input).setText(ui_settings.get('train_script_path', ''))
         get_path_widget(self.src_dir_input).setText(config.get('data', {}).get('src_dir', '')); get_path_widget(self.dst_dir_input).setText(config.get('data', {}).get('dst_dir', '')); get_path_widget(self.model_folder_input).setText(config.get('data', {}).get('output_dir', '')); self.resolution_input.setCurrentText(str(config.get('data', {}).get('resolution', 512))); self.model_size_dims_input.setCurrentText(str(config.get('model', {}).get('model_size_dims', 128))); self.iter_per_epoch_input.setValue(config.get('training', {}).get('iterations_per_epoch', 500)); self.batch_size_input.setValue(config.get('training', {}).get('batch_size', 4)); self.use_amp_input.setChecked(config.get('training', {}).get('use_amp', True)); self.log_interval_input.setValue(config.get('logging', {}).get('log_interval', 5)); self.preview_interval_input.setValue(config.get('logging', {}).get('preview_batch_interval', 35)); self.preview_refresh_input.setValue(config.get('logging', {}).get('preview_refresh_rate', 5)); self.keep_checkpoints_input.setValue(config.get('saving', {}).get('keep_last_checkpoints', 4))
-        
+
         # Reset augs before populating
         self.hflip_check.setChecked(False); self.affine_check.setChecked(False); self.gamma_check.setChecked(False)
         augs = config.get('dataloader', {}).get('datasets', {}).get('shared_augs', [])
@@ -295,7 +338,14 @@ class MainWindow(QMainWindow):
     def start_conversion_process(self, target_type):
         model_folder_str = self.model_folder_input.findChild(QLineEdit).text()
         if not model_folder_str or not Path(model_folder_str).is_dir():
-            QMessageBox.warning(self, "Error", "Model Folder is not set or does not exist."); return
+            self.tabs.setCurrentWidget(self.tabs.widget(0))
+            self.model_folder_input.findChild(QLineEdit).setFocus()
+            QMessageBox.warning(
+                self,
+                "Model Folder required",
+                "Set an existing Model Folder in the Main tab. It should contain the .pth checkpoint you want to convert.",
+            )
+            return
         source_path_str, _ = QFileDialog.getOpenFileName(self, "Select Checkpoint File", model_folder_str, "PyTorch Checkpoints (*.pth)")
         if not source_path_str: return
         if self.copy_before_convert_check.isChecked():
