@@ -24,28 +24,21 @@ Flame:
 [![Flame video](https://img.youtube.com/vi/6-OFAJtfliM/hqdefault.jpg)](https://youtu.be/6-OFAJtfliM)
 
 
-## For Windows:   
-✅ Make sure Miniconda or Anaconda is installed:
-###[[Install Video](https://youtu.be/QaAca_LiwKc))]
+## For Windows:
 
-```
-git clone --branch multios --single-branch https://github.com/tpc2233/tunet.git
-cd tunet
+Download this fork, then run the PowerShell installer from its folder:
 
-conda create -n tunet python=3.12.9 -y
-conda activate tunet
-
-pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128 
-
-pip install onnx pyyaml lpips onnxruntime Pillow albumentations PySide6
-
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\install.ps1
 ```
 
-```
-TEST YOUR INSTALLATION:
-python -c "import torch; print('Torch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU only')"
+It fetches the selected branch from GitHub, installs Python 3.12 if needed, creates a private virtual environment, installs the latest stable PyTorch CUDA 13.2 wheels from the official PyTorch index and adds a TuNet shortcut to the Start menu. A compatible NVIDIA driver is required; the separate CUDA Toolkit is not.
 
-Should give your GPU and Torch version, cuda available: True. if not, was not installed properlly. 
+For CPU-only installation, use `.\install.ps1 -CpuOnly`. To install another fork or branch:
+
+```powershell
+.\install.ps1 -RepositoryOwner SEU_USUARIO -RepositoryName tunet -Branch windows
 ```
 
 ## For macOS:   
@@ -129,3 +122,8 @@ Consider cite TUNET in your project.
 The source code is licensed under the Apache License, Version 2.0.
 Commercial use Permission 
 
+
+
+## Créditos do fork Windows
+
+Projeto, arquitetura e modelo originais por **Thiago Porto (@tpc2233)**: [tpc2233/tunet](https://github.com/tpc2233/tunet). Este é um fork comunitário, sem endosso do autor upstream. Licença Apache-2.0: preserve os avisos de copyright e [LICENSE](LICENSE).
