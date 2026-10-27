@@ -137,6 +137,17 @@ def load_model_and_config(checkpoint_path, device):
     if all(key.startswith('module.') for key in state_dict):
         logging.info("Removing 'module.' prefix from state_dict keys.")
         state_dict = {k.replace('module.', '', 1): v for k, v in state_dict.items()}
+    # The current training script names these modules *_block, while this
+    # inference definition uses the shorter names. Keep loading old checkpoints
+    # unchanged and translate checkpoints produced by train.py.
+    if any('.d_block.' in key or '.m_block.' in key or '.c_block.' in key for key in state_dict):
+        logging.info("Mapping training checkpoint module names for inference.")
+        state_dict = {
+            key.replace('.d_block.', '.d.')
+                .replace('.m_block.', '.m.')
+                .replace('.c_block.', '.c.'): value
+            for key, value in state_dict.items()
+        }
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()

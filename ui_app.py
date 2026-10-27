@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QSplitter, QProgressDialog, QDoubleSpinBox
 )
 from PySide6.QtCore import Qt, QObject, Signal, Slot, QFileSystemWatcher, QTimer, QThread
-from PySide6.QtGui import QPixmap, QTextCursor
+from PySide6.QtGui import QPixmap, QTextCursor, QIcon
 
 
 class IndentDumper(yaml.SafeDumper):
@@ -71,7 +71,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"Tunet Training UI - Running on {platform.system()}")
-        self.setGeometry(100, 100, 900, 700)
+        self.setGeometry(100, 100, 1100, 760)
+        self.setMinimumSize(850, 620)
+        self.setStyleSheet("""QMainWindow { background: #101820; } QWidget { color: #e8eef2; font-size: 10pt; } QTabWidget::pane { border: 1px solid #30414c; border-radius: 8px; background: #17232c; } QTabBar::tab { background: #1d2c36; padding: 9px 14px; margin-right: 3px; border-top-left-radius: 6px; border-top-right-radius: 6px; } QTabBar::tab:selected { background: #263b46; color: #72dfc3; } QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit { background: #111b22; border: 1px solid #40545f; border-radius: 5px; padding: 6px; selection-background-color: #187d70; } QPushButton { background: #263b46; border: 1px solid #49616d; border-radius: 6px; padding: 8px 12px; } QPushButton:hover { border-color: #72dfc3; } QPushButton:focus { border: 2px solid #72dfc3; } QPushButton:disabled { color: #87949b; background: #202a30; } QCheckBox { spacing: 8px; }""")
         self.process = None; self.utility_process = None; self.config_file_path = Path("config_from_ui.yaml")
         self.preview_image_path = None; self.original_pixmap = None; self.copy_thread = None; self.conversion_target = None
         self.central_widget = QWidget(); self.setCentralWidget(self.central_widget)
@@ -82,6 +84,10 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(splitter); self.main_layout.addLayout(self.create_control_panel())
         self.create_main_tab(); self.create_advanced_tab(); self.create_dataloader_tab()
         self.create_preview_tab(); self.create_convert_tab(); self.create_about_tab()
+        icon_dir = Path(__file__).parent / "assets" / "icons"
+        for index, icon_name in enumerate(("overview", "settings", "dataset", "preview", "export", "info")):
+            icon_path = icon_dir / f"{icon_name}.svg"
+            if icon_path.is_file(): self.tabs.setTabIcon(index, QIcon(str(icon_path)))
         self.file_watcher = QFileSystemWatcher(); self.file_watcher.fileChanged.connect(self.update_preview_image)
         self.tabs.currentChanged.connect(self.on_tab_changed)
         self.preview_timer = QTimer(self); self.preview_timer.setInterval(2500); self.preview_timer.timeout.connect(self.update_preview_image)
@@ -101,7 +107,7 @@ class MainWindow(QMainWindow):
         tab = QWidget(); layout = QFormLayout(tab); layout.addRow(QLabel("--- Launcher Settings ---")); self.train_script_input = self.create_path_selector("Training Script (.py)", is_file=True); layout.addRow("Training Script:", self.train_script_input)
         if platform.system() == 'Linux': self.nproc_input = QSpinBox(minimum=1, maximum=16, value=1); layout.addRow("GPUs (nproc_per_node):", self.nproc_input)
         else: self.nproc_input = None
-        layout.addRow(QLabel(" ")); self.src_dir_input = self.create_path_selector("Source Directory"); self.dst_dir_input = self.create_path_selector("Destination Directory"); self.model_folder_input = self.create_path_selector("Model Folder", is_output=True); self.resolution_input = QComboBox(); self.resolution_input.addItems(["512", "1024"]); self.model_size_dims_input = QComboBox(); self.model_size_dims_input.addItems(["64", "128", "256", "512"]); self.model_size_dims_input.setCurrentText("128"); layout.addRow(QLabel("--- Data Settings ---")); layout.addRow("Source Directory:", self.src_dir_input); layout.addRow("Destination Directory:", self.dst_dir_input); layout.addRow("Model Folder:", self.model_folder_input); layout.addRow("Resolution:", self.resolution_input); layout.addRow(QLabel("--- Model Settings ---")); layout.addRow("Model Size Dims:", self.model_size_dims_input); self.tabs.addTab(tab, "Main")
+        layout.addRow(QLabel(" ")); self.src_dir_input = self.create_path_selector("Source Directory"); self.dst_dir_input = self.create_path_selector("Destination Directory"); self.model_folder_input = self.create_path_selector("Model Folder", is_output=True); self.resolution_input = QComboBox(); self.resolution_input.addItems(["512", "1024"]); self.model_size_dims_input = QComboBox(); self.model_size_dims_input.addItems(["64", "128", "256", "512"]); self.model_size_dims_input.setCurrentText("64"); layout.addRow(QLabel("--- Data Settings ---")); layout.addRow("Source Directory:", self.src_dir_input); layout.addRow("Destination Directory:", self.dst_dir_input); layout.addRow("Model Folder:", self.model_folder_input); layout.addRow("Resolution:", self.resolution_input); layout.addRow(QLabel("--- Model Settings ---")); layout.addRow("Model Size Dims:", self.model_size_dims_input); self.tabs.addTab(tab, "Main")
     def create_path_selector(self, label_text, is_output=False, is_file=False):
         widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(0, 0, 0, 0); line_edit = QLineEdit(); button = QPushButton("Browse...")
         if is_file: button.clicked.connect(lambda: self.select_file(line_edit))
@@ -116,7 +122,7 @@ class MainWindow(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Python Script", "", "Python Files (*.py)");
         if file_path: line_edit.setText(file_path)
     def create_advanced_tab(self):
-        tab = QWidget(); layout = QFormLayout(tab); self.iter_per_epoch_input = QSpinBox(minimum=1, maximum=10000, value=500); self.batch_size_input = QSpinBox(minimum=1, maximum=256, value=4); self.use_amp_input = QCheckBox("Enable fp16 Mixed-precision"); self.use_amp_input.setChecked(True); self.log_interval_input = QSpinBox(minimum=1, maximum=1000, value=5); self.preview_interval_input = QSpinBox(minimum=0, maximum=1000, value=35); self.preview_refresh_input = QSpinBox(minimum=0, maximum=1000, value=5); self.keep_checkpoints_input = QSpinBox(minimum=1, maximum=50, value=4); layout.addRow(QLabel("--- Training Settings ---")); layout.addRow("Iterations per Epoch:", self.iter_per_epoch_input); layout.addRow("Batch Size (per GPU):", self.batch_size_input); layout.addRow("Use AMP:", self.use_amp_input); layout.addRow(QLabel("--- Logging & Saving Settings ---")); layout.addRow("Log Interval:", self.log_interval_input); layout.addRow("Preview Batch Interval:", self.preview_interval_input); layout.addRow("Preview Refresh Rate:", self.preview_refresh_input); layout.addRow("Keep Last Checkpoints:", self.keep_checkpoints_input); self.tabs.addTab(tab, "Advanced")
+        tab = QWidget(); layout = QFormLayout(tab); self.iter_per_epoch_input = QSpinBox(minimum=1, maximum=10000, value=500); self.batch_size_input = QSpinBox(minimum=1, maximum=256, value=2); self.use_amp_input = QCheckBox("Enable fp16 Mixed-precision"); self.use_amp_input.setChecked(False); self.log_interval_input = QSpinBox(minimum=1, maximum=1000, value=5); self.preview_interval_input = QSpinBox(minimum=0, maximum=1000, value=35); self.preview_refresh_input = QSpinBox(minimum=0, maximum=1000, value=5); self.keep_checkpoints_input = QSpinBox(minimum=1, maximum=50, value=4); layout.addRow(QLabel("--- Training Settings ---")); layout.addRow("Iterations per Epoch:", self.iter_per_epoch_input); layout.addRow("Batch Size (per GPU):", self.batch_size_input); layout.addRow("Use AMP:", self.use_amp_input); layout.addRow(QLabel("--- Logging & Saving Settings ---")); layout.addRow("Log Interval:", self.log_interval_input); layout.addRow("Preview Batch Interval:", self.preview_interval_input); layout.addRow("Preview Refresh Rate:", self.preview_refresh_input); layout.addRow("Keep Last Checkpoints:", self.keep_checkpoints_input); self.tabs.addTab(tab, "Advanced")
 
     def create_dataloader_tab(self):
         tab = QWidget()
@@ -183,7 +189,7 @@ class MainWindow(QMainWindow):
     def create_convert_tab(self):
         tab = QWidget(); layout = QVBoxLayout(tab); layout.addStretch(); self.convert_flame_btn = QPushButton("Convert to Autodesk Flame"); self.convert_flame_btn.clicked.connect(self.run_flame_conversion); self.convert_nuke_btn = QPushButton("Convert to Foundry Nuke"); self.convert_nuke_btn.clicked.connect(self.run_nuke_conversion); self.copy_before_convert_check = QCheckBox("Copy checkpoint to subfolder before converting"); self.copy_before_convert_check.setChecked(True); self.copy_before_convert_check.setStyleSheet("margin-top: 10px;"); layout.addWidget(self.convert_flame_btn); layout.addWidget(self.convert_nuke_btn); layout.addWidget(self.copy_before_convert_check, alignment=Qt.AlignCenter); layout.addStretch(); self.tabs.addTab(tab, "Convert")
     def create_about_tab(self):
-        tab = QWidget(); layout = QVBoxLayout(tab); layout.setAlignment(Qt.AlignCenter); title = QLabel("Tunet by tpo.comp"); title.setStyleSheet("font-size: 18px; font-weight: bold;"); desc_text = ("A direct, pixel-level mapping from src to dst images via an encoder-decoder network.\n" "Supports training, inference, and export to VFX tools."); description = QLabel(desc_text); description.setAlignment(Qt.AlignCenter); description.setWordWrap(True); support_text = "Native inference support in Autodesk Flame or Foundry Nuke."; support = QLabel(support_text); support.setAlignment(Qt.AlignCenter); source_title = QLabel("Source:"); source_link = QLabel('<a href="https://github.com/tpc2233/tunet">https://github.com/tpc2233/tunet</a>'); source_link.setOpenExternalLinks(True); source_link.setAlignment(Qt.AlignCenter); layout.addStretch(); layout.addWidget(title); layout.addSpacing(15); layout.addWidget(description); layout.addSpacing(10); layout.addWidget(support); layout.addSpacing(25); layout.addWidget(source_title); layout.addWidget(source_link); layout.addStretch(); self.tabs.addTab(tab, "About")
+        tab = QWidget(); layout = QVBoxLayout(tab); layout.setAlignment(Qt.AlignCenter); title = QLabel("Tunet by tpo.comp"); title.setStyleSheet("font-size: 18px; font-weight: bold;"); desc_text = ("A direct, pixel-level mapping from src to dst images via an encoder-decoder network.\n" "Supports training, inference, and export to VFX tools."); description = QLabel(desc_text); description.setAlignment(Qt.AlignCenter); description.setWordWrap(True); support_text = "Native inference support in Autodesk Flame or Foundry Nuke."; support = QLabel(support_text); support.setAlignment(Qt.AlignCenter); credit = QLabel("Windows community fork by opoeta. Original project and model by Thiago Porto (@tpc2233).") ; credit.setAlignment(Qt.AlignCenter); credit.setWordWrap(True); source_title = QLabel("Upstream source:"); source_link = QLabel('<a href="https://github.com/tpc2233/tunet">https://github.com/tpc2233/tunet</a>'); source_link.setOpenExternalLinks(True); source_link.setAlignment(Qt.AlignCenter); layout.addStretch(); layout.addWidget(title); layout.addSpacing(15); layout.addWidget(description); layout.addSpacing(10); layout.addWidget(support); layout.addSpacing(25); layout.addWidget(credit); layout.addSpacing(12); layout.addWidget(source_title); layout.addWidget(source_link); layout.addStretch(); self.tabs.addTab(tab, "About")
     def create_control_panel(self):
         control_layout = QHBoxLayout(); self.load_btn = QPushButton("Load Config"); self.save_btn = QPushButton("Save Config"); self.start_btn = QPushButton("Start Training"); self.stop_btn = QPushButton("Stop Training"); self.load_btn.clicked.connect(self.load_config_from_file); self.save_btn.clicked.connect(self.save_config_to_file); self.start_btn.clicked.connect(self.start_training); self.stop_btn.clicked.connect(self.stop_training); self.stop_btn.setEnabled(False); self.start_btn.setStyleSheet("background-color: #a8e6cf;"); self.stop_btn.setStyleSheet("background-color: #ff8a80;"); control_layout.addWidget(self.load_btn); control_layout.addWidget(self.save_btn); control_layout.addStretch(); control_layout.addWidget(self.start_btn); control_layout.addWidget(self.stop_btn); return control_layout
     
@@ -250,7 +256,11 @@ class MainWindow(QMainWindow):
         full_config = self.gather_config_from_ui(); train_script = full_config['_ui_settings']['train_script_path']
         if not train_script or not Path(train_script).is_file(): QMessageBox.warning(self, "Error", "Training script path is invalid."); return
         model_folder = Path(full_config['data']['output_dir'])
-        if not model_folder.is_dir(): QMessageBox.warning(self, "Error", "Model Folder does not exist."); return
+        src_dir = Path(full_config["data"]["src_dir"])
+        dst_dir = Path(full_config["data"]["dst_dir"])
+        if not src_dir.is_dir() or not dst_dir.is_dir(): QMessageBox.warning(self, "Dados inválidos", "Selecione diretórios existentes para Source e Destination."); return
+        try: model_folder.mkdir(parents=True, exist_ok=True)
+        except OSError as exc: QMessageBox.warning(self, "Pasta inválida", f"Não foi possível criar a pasta de modelos: {exc}"); return
         self.setup_preview_watcher(str(model_folder))
         script_config = {k: v for k, v in full_config.items() if k != '_ui_settings'}
         with open(self.config_file_path, 'w') as f:
