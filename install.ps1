@@ -39,6 +39,30 @@ function Test-Python312Runtime {
     }
 }
 
+function Install-Python312Runtime {
+    $installerUrl = 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe'
+    $installerPath = Join-Path ([IO.Path]::GetTempPath()) ('python-3.12.10-' + [guid]::NewGuid().ToString('N') + '.exe')
+    $pythonHome = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312'
+    try {
+        Write-Host 'Downloading the official Python 3.12.10 installer from python.org...'
+        Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+        $signature = Get-AuthenticodeSignature -FilePath $installerPath
+        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+            throw 'The downloaded Python installer signature is invalid or is not from the Python Software Foundation.'
+        }
+
+        $arguments = "/quiet InstallAllUsers=0 PrependPath=0 Include_launcher=1 InstallLauncherAllUsers=0 Include_pip=1 Include_test=0 TargetDir=`"$pythonHome`""
+        $process = Start-Process -FilePath $installerPath -ArgumentList $arguments -Wait -PassThru
+        if ($process.ExitCode -notin @(0, 3010)) { throw "Python installation failed with exit code $($process.ExitCode)." }
+
+        $pythonPath = Join-Path $pythonHome 'python.exe'
+        if (-not (Test-Path $pythonPath)) { throw 'Python installer completed, but python.exe was not found in the expected location.' }
+        return $pythonPath
+    } finally {
+        if (Test-Path $installerPath) { Remove-Item -LiteralPath $installerPath -Force }
+    }
+}
+
 if ($env:OS -ne 'Windows_NT') { throw 'Este instalador requer Windows.' }
 $venvPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
 $isUpdate = (Test-Path (Join-Path $InstallDir 'ui_app.py')) -and (Test-Path $venvPython)
@@ -49,19 +73,14 @@ if ($isUpdate) {
 }
 
 $python = $null
+$pythonArguments = @()
 if (-not (Test-Path $venvPython)) {
     $python = Find-PythonLauncher
     $hasPython312 = $python -and (Test-Python312Runtime $python)
+    if ($hasPython312) { $pythonArguments = @('-3.12') }
     if (-not $hasPython312) {
-        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-            throw 'Python 3.12 runtime was not found and winget is unavailable. Install Python 3.12, then run this script again.'
-        }
-        Write-Host 'Python 3.12 runtime not found. Installing it for the current user...'
-        Invoke-Native 'winget' @('install','--id','Python.Python.3.12','--exact','--scope','user','--accept-package-agreements','--accept-source-agreements')
-
-        $python = Find-PythonLauncher
-        if (-not $python) { throw 'Python was installed, but the py launcher was not found. Restart PowerShell and run this script again.' }
-        if (-not (Test-Python312Runtime $python)) { throw 'Python 3.12 was installed, but its runtime is unavailable to the launcher. Restart PowerShell and run this script again.' }
+        Write-Host 'Python 3.12 runtime not found. Installing it without requiring winget...'
+        $python = Install-Python312Runtime
     }
 }
 
@@ -104,7 +123,7 @@ try {
     Get-ChildItem -LiteralPath $sourceRoot -Force | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $InstallDir -Recurse -Force
     }
-    if (-not (Test-Path $venvPython)) { Invoke-Native $python @('-3.12','-m','venv',(Join-Path $InstallDir '.venv')) }
+    if (-not (Test-Path $venvPython)) { Invoke-Native $python ($pythonArguments + @('-m','venv',(Join-Path $InstallDir '.venv'))) }
     Invoke-Native $venvPython @('-m','pip','install','--upgrade','pip')
     if ($CpuOnly) {
         Invoke-Native $venvPython @('-m','pip','install','torch','torchvision','--index-url','https://download.pytorch.org/whl/cpu')
