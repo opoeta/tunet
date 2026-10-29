@@ -29,6 +29,16 @@ function Find-PythonLauncher {
     return $null
 }
 
+function Test-Python312Runtime {
+    param([string]$Launcher)
+    try {
+        & $Launcher -3.12 -c 'import sys; print(sys.executable)' 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
 if ($env:OS -ne 'Windows_NT') { throw 'Este instalador requer Windows.' }
 $venvPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
 $isUpdate = (Test-Path (Join-Path $InstallDir 'ui_app.py')) -and (Test-Path $venvPython)
@@ -41,11 +51,7 @@ if ($isUpdate) {
 $python = $null
 if (-not (Test-Path $venvPython)) {
     $python = Find-PythonLauncher
-    $hasPython312 = $false
-    if ($python) {
-        & $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
-        $hasPython312 = ($LASTEXITCODE -eq 0)
-    }
+    $hasPython312 = $python -and (Test-Python312Runtime $python)
     if (-not $hasPython312) {
         if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
             throw 'Python 3.12 runtime was not found and winget is unavailable. Install Python 3.12, then run this script again.'
@@ -55,8 +61,7 @@ if (-not (Test-Path $venvPython)) {
 
         $python = Find-PythonLauncher
         if (-not $python) { throw 'Python was installed, but the py launcher was not found. Restart PowerShell and run this script again.' }
-        & $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
-        if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 was installed, but its runtime is unavailable to the launcher. Restart PowerShell and run this script again.' }
+        if (-not (Test-Python312Runtime $python)) { throw 'Python 3.12 was installed, but its runtime is unavailable to the launcher. Restart PowerShell and run this script again.' }
     }
 }
 
