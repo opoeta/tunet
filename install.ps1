@@ -140,6 +140,8 @@ try {
     $shortcut.Arguments = ('"' + (Join-Path $InstallDir 'ui_app.py') + '"')
     $shortcut.WorkingDirectory = $InstallDir
     $shortcut.Description = 'TuNet — treinamento e inferência de imagens'
+    $iconPath = Join-Path $InstallDir 'assets\icons\tunet.ico'
+    if (Test-Path $iconPath) { $shortcut.IconLocation = "$iconPath,0" }
     $shortcut.Save()
     if ($isUpdate) {
         Write-Host "TuNet update completed: $InstallDir"

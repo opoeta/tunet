@@ -70,6 +70,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("TuNet - Windows")
+        app_icon = Path(__file__).parent / "assets" / "icons" / "tunet.ico"
+        if not app_icon.is_file(): app_icon = Path(__file__).parent / "assets" / "icons" / "tunet.png"
+        if app_icon.is_file(): self.setWindowIcon(QIcon(str(app_icon)))
         self.setGeometry(100, 100, 1100, 760)
         self.setMinimumSize(850, 620)
         self.setStyleSheet("""QMainWindow { background: #101820; } QWidget { color: #e8eef2; font-size: 10pt; } QTabWidget::pane { border: 1px solid #30414c; border-radius: 8px; background: #17232c; } QTabBar::tab { background: #1d2c36; padding: 9px 14px; margin-right: 3px; border-top-left-radius: 6px; border-top-right-radius: 6px; } QTabBar::tab:selected { background: #263b46; color: #72dfc3; } QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit { background: #111b22; border: 1px solid #40545f; border-radius: 5px; padding: 6px; selection-background-color: #187d70; } QPushButton { background: #263b46; border: 1px solid #49616d; border-radius: 6px; padding: 8px 12px; } QPushButton:hover { border-color: #72dfc3; } QPushButton:focus { border: 2px solid #72dfc3; } QPushButton:disabled { color: #87949b; background: #202a30; } QCheckBox { spacing: 8px; }""")
