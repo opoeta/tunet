@@ -15,6 +15,20 @@ function Invoke-Native {
     if ($LASTEXITCODE -ne 0) { throw "Falha ($LASTEXITCODE): $File $($Arguments -join ' ')" }
 }
 
+function Find-PythonLauncher {
+    $launcher = Get-Command py -ErrorAction SilentlyContinue
+    if ($launcher) { return $launcher.Source }
+
+    $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Launcher\py.exe'),
+        (Join-Path $env:WINDIR 'py.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) { return $candidate }
+    }
+    return $null
+}
+
 if ($env:OS -ne 'Windows_NT') { throw 'Este instalador requer Windows.' }
 $venvPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
 $isUpdate = (Test-Path (Join-Path $InstallDir 'ui_app.py')) -and (Test-Path $venvPython)
@@ -26,15 +40,24 @@ if ($isUpdate) {
 
 $python = $null
 if (-not (Test-Path $venvPython)) {
-    if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-        if (Get-Command winget -ErrorAction SilentlyContinue) {
-            Write-Host 'Installing Python 3.12 for the current user...'
-            Invoke-Native 'winget' @('install','--id','Python.Python.3.12','--exact','--scope','user','--accept-package-agreements','--accept-source-agreements')
-        } else { throw 'Install Python 3.12 with the py launcher and run this script again.' }
+    $python = Find-PythonLauncher
+    $hasPython312 = $false
+    if ($python) {
+        & $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
+        $hasPython312 = ($LASTEXITCODE -eq 0)
     }
-    $python = (Get-Command py).Source
-    & $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
-    if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 was not found. Install it and run this script again.' }
+    if (-not $hasPython312) {
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            throw 'Python 3.12 runtime was not found and winget is unavailable. Install Python 3.12, then run this script again.'
+        }
+        Write-Host 'Python 3.12 runtime not found. Installing it for the current user...'
+        Invoke-Native 'winget' @('install','--id','Python.Python.3.12','--exact','--scope','user','--accept-package-agreements','--accept-source-agreements')
+
+        $python = Find-PythonLauncher
+        if (-not $python) { throw 'Python was installed, but the py launcher was not found. Restart PowerShell and run this script again.' }
+        & $python -3.12 -c 'import sys; print(sys.executable)' 2>$null
+        if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 was installed, but its runtime is unavailable to the launcher. Restart PowerShell and run this script again.' }
+    }
 }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('tunet-install-' + [guid]::NewGuid().ToString('N'))
